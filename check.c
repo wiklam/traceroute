@@ -10,6 +10,14 @@ u_int16_t compute_icmp_checksum (const void *buff, int length){ //function from 
     return (u_int16_t)(~(sum + (sum >> 16)));
 }
 
+const char *Inet_ntop(int af, const void *src, char *dst, socklen_t size){
+    const char* rv = inet_ntop(af, src, dst, size);
+    if(rv == NULL){
+        fprintf(stderr, "Inet_ntop error\n");
+        exit(EXIT_FAILURE);        
+    }
+    return rv;
+}
 
 int Select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout){
     int rv = select(nfds, readfds, writefds, exceptfds, timeout);
