@@ -1,21 +1,26 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-#include <errno.h>
-#include <sys/time.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <netinet/ip_icmp.h>
-#include <unistd.h>
-#include <sys/sysmacros.h>
-#include <sys/types.h>          /* See NOTES - not required but in use in historical implementations*/
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
+#include <stdio.h>              // printf, frintf
+#include <stdlib.h>             // exit, free, malloc
+#include <string.h>             // strigns, strerror()
+#include <assert.h>             // assert in compute_icmp_checksum
+#include <errno.h>              // errno
+#include <unistd.h>             // getpid()
+#include <netinet/in.h>         //struct sockaddr_in 
+#include <netinet/ip_icmp.h>    // struct icmp, IP_MAXPACKET
+#include <sys/time.h>           // struct timezone, timersub, gettimeofday()
+#include <sys/types.h>          // according to earlier standards
+#include <sys/select.h>         // select()
+#include <sys/socket.h>         // socket()
+#include <arpa/inet.h>          // inet_ntop/pton()
 
-//Functions in check.c - data and functions checked for corresctness
-u_int16_t compute_icmp_checksum (const void *buff, int length); //function from lecture
+
+struct data{    // struct used to get informations from received packets 
+    char *ip;
+    uint8_t type, code;
+    uint16_t id, seq;
+};
+
+// Functions in check.c - data and functions checked for correctness
+u_int16_t compute_icmp_checksum (const void *buff, int length);
 const char *Inet_ntop(int af, const void *src, char *dst, socklen_t size);
 int Inet_pton(int af, const char *src, void *dst);
 
@@ -29,7 +34,8 @@ ssize_t Sendto(int sockfd, const void *buf, size_t len, int flags, const struct 
 void error_handle(const char *str, char *err);
 
 int Gettimeofday(struct timeval *tv, struct timezone *tz);
-void check_enter(int num, char *table[]);
 
-//Functions in network.c - network handle
+int check_enter(int num, char *table[]);
+
+// Function in network.c - similar to traceroute -I
 void traceroute(char *ip);

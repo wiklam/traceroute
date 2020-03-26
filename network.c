@@ -1,18 +1,11 @@
 #include "header.h"
 
-static fd_set descriptors;
-static struct data{
-    char *ip;
-    uint8_t type, code;
-    uint16_t id, seq;
-};
-
 
 static void set_icmp_header(struct icmp *header, int seq){
     header->icmp_type = ICMP_ECHO;
     header->icmp_code = 0;
-    header->icmp_hun.ih_idseq.icd_id = getpid();
-    header->icmp_hun.ih_idseq.icd_seq = seq;
+    header->icmp_hun.ih_idseq.icd_id = getpid();    // allows to distinguish packets from different process
+    header->icmp_hun.ih_idseq.icd_seq = seq;        // unique number for packet in our process
     header->icmp_cksum = 0;
     header->icmp_cksum = compute_icmp_checksum((u_int16_t*) header, sizeof(*header));
 }
@@ -25,7 +18,7 @@ static void set_sockaddr_in(struct sockaddr_in *recipient, char *ip){
 }
 
 
-static void get_data(u_int8_t *buffer, struct sockaddr_in *sender, struct data *data){
+static int get_data(u_int8_t *buffer, struct sockaddr_in *sender, struct data *data){
     data->ip = malloc(20 * sizeof(char));
     Inet_ntop(AF_INET, &(sender->sin_addr), data->ip, 20);
     
@@ -36,19 +29,19 @@ static void get_data(u_int8_t *buffer, struct sockaddr_in *sender, struct data *
     data->type = icmp_header->icmp_type;
     data->code = icmp_header->icmp_code;
 
-    if(data->type == ICMP_ECHOREPLY && data->code == 0){
+    if(data->type == ICMP_ECHOREPLY && data->code == 0){    // Echo reply
         data->id = icmp_header->icmp_id;
         data->seq = icmp_header->icmp_seq;
-        return;
+        return 1;
     }
-    if(data->type == ICMP_TIME_EXCEEDED && data->code == 0){
+    if(data->type == ICMP_TIME_EXCEEDED && data->code == 0){    // Time exceed message with code time to live exceed in transit
         ip_header = (struct ip*) &icmp_header->icmp_data;
         struct icmp* new_icmp_header = (void*) ip_header + 4 * ip_header->ip_hl;
         data->id = new_icmp_header->icmp_id;
         data->seq = new_icmp_header->icmp_seq;
-        return;
+        return 1;
     }
-    error_handle("Unexpected packet in get_data", NULL);
+    return 0;
 }
 
 
@@ -58,7 +51,7 @@ static void output(int ttl, int reached, char *ip[3], struct timeval times[3]){
         printf("* * *\n");
         return;
     }
-    for(int it = 0; it < reached; it++){
+    for(int it = 0; it < reached; it++){    // if there is an ip which wasn't printed, print it
         int diff = 1;
         for(int iter = it -1; iter >= 0; iter--){
             if(strcmp(ip[iter], ip[it]) == 0)
@@ -67,7 +60,7 @@ static void output(int ttl, int reached, char *ip[3], struct timeval times[3]){
         if(diff)
             printf("%s ", ip[it]);
     }
-    if(reached == 3){
+    if(reached == 3){   // if we catched all response packets calculate the average time
         float sum = (times[0].tv_sec + times[1].tv_sec + times[2].tv_sec) * 1000 + times[0].tv_usec + times[1].tv_usec + times[2].tv_usec;
         printf("%.3f ms\n", sum/3000);
     }
@@ -76,28 +69,21 @@ static void output(int ttl, int reached, char *ip[3], struct timeval times[3]){
 }
 
 
-static int get_one(int sfd, struct data *data){
-    //fprintf(stderr, "Get one w srodku\n");
+static int get_one_packet(int sfd, struct data *data){
     struct sockaddr_in sender;
     socklen_t sender_len = sizeof(sender);
     u_int8_t buffer[IP_MAXPACKET];
 
-    ssize_t packet_len = recvfrom(sfd, buffer, IP_MAXPACKET, 0, (struct sockaddr*) &sender, &sender_len);
-    if(packet_len < 0 && errno == EWOULDBLOCK)
-        return 0;
-    //fprintf(stderr, "HMM \n");
-    if(packet_len == 0)
-        return 0;
-    get_data(buffer, &sender, data);
+    Recvfrom(sfd, buffer, IP_MAXPACKET, 0, (struct sockaddr*) &sender, &sender_len);
 
-    return 1;
+    return get_data(buffer, &sender, data);
 }
 
 
 static void sendpackets(int fd1, int ttl, struct sockaddr_in *recipient){
     for(int it = 0; it < 3; it++){
         struct icmp header;
-        set_icmp_header(&header, ttl * 3 + it);  //unique seq number for each packet in process
+        set_icmp_header(&header, ttl * 3 + it);  // unique seq number for each packet in process - ttl * 3 + it
 
         Setsockopt(fd1, IPPROTO_IP, IP_TTL, &ttl, sizeof(int));
 
@@ -117,34 +103,40 @@ static int receivepackets(int sfd, int ttl){
     timeout.tv_sec = 1;
     timeout.tv_usec = 0;
 
-    Gettimeofday(&start, NULL);
+    fd_set descriptors;
     FD_ZERO(&descriptors);
     FD_SET(sfd, &descriptors);
+
+    Gettimeofday(&start, NULL); // start - time value for which we will compare how long we have benn waiting for a response
+
+
     while(Select(sfd + 1, &descriptors, NULL, NULL, &timeout)){  //in LINUX Select modifies timeout http://man7.org/linux/man-pages/man2/select.2.html
         struct data data;
-        ////fprintf(stderr, "Select\n");
-        if(get_one(sfd, &data)){
-            if(data.id == getpid() && data.seq / 3 == ttl){
+        
+        if(get_one_packet(sfd, &data)){
+            if(data.id == getpid() && data.seq / 3 == ttl){ // checking id it is our packet
                 if(data.type == ICMP_ECHOREPLY)
                     arrived = 1;
                 
-                //fprintf(stderr, "get_one %d\n", reached);
-                Gettimeofday(&actual, NULL);
+                Gettimeofday(&actual, NULL);    // actual -time of receiving the packet
 
                 ip_address[reached] = data.ip;
                 timersub(&actual, &start, &times[reached]);
 
                 reached++;
-                if(reached > 3)
-                    error_handle("Too many packets arrived", NULL);
+                if(reached == 3)
+                    break;
             }
         }
         FD_ZERO(&descriptors);
         FD_SET(sfd, &descriptors);
     }
+
     output(ttl, reached, ip_address, times);
-    for(int it = 0; it < reached; it++)
+
+    for(int it = 0; it < reached; it++) // freeing memory after malloc in get_data (ugly)
         free(ip_address[it]);
+
     return arrived; 
 }
 
@@ -159,7 +151,6 @@ void traceroute(char *ip){
 
     while(ttl <= 30 && !arrived){
         sendpackets(sockfd1, ttl, &recipient);
-        //fprintf(stderr, "%d ttl juz\n", ttl);
         arrived = receivepackets(sockfd1, ttl);
         ttl++;
     }

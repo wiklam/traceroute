@@ -1,11 +1,14 @@
 #include "header.h"
 
+// cmain function of check.c is define functions which handle errors 
+
 void error_handle(const char *str, char *err){
     fprintf(stderr, str, err);
     exit(EXIT_FAILURE); 
 }
 
-u_int16_t compute_icmp_checksum (const void *buff, int length){ //function from lecture
+
+u_int16_t compute_icmp_checksum (const void *buff, int length){ // lecture function
     u_int32_t sum;
     const u_int16_t* ptr = buff;
     assert (length % 2 == 0);
@@ -15,6 +18,7 @@ u_int16_t compute_icmp_checksum (const void *buff, int length){ //function from 
     return (u_int16_t)(~(sum + (sum >> 16)));
 }
 
+
 const char *Inet_ntop(int af, const void *src, char *dst, socklen_t size){
     const char* rv = inet_ntop(af, src, dst, size);
     if(rv == NULL)
@@ -22,12 +26,14 @@ const char *Inet_ntop(int af, const void *src, char *dst, socklen_t size){
     return rv;
 }
 
+
 int Inet_pton(int af, const char *src, void *dst){
     int rv = inet_pton(af, src, dst);
-    if(rv <= 0)                                                //CHECK EQUAL ZERO
+    if(rv < 0)
         error_handle("Inet_pton error: %s\n", strerror(errno));
     return rv;
 }
+
 
 int Select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout){
     int rv = select(nfds, readfds, writefds, exceptfds, timeout);
@@ -43,6 +49,7 @@ int Socket(int domain, int type, int protocol){
         error_handle("Socket error %s\n", strerror(errno));
     return rv;
 }
+
 
 int Setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen){
     int rv = setsockopt(sockfd, level, optname, optval, optlen);
@@ -78,10 +85,14 @@ int Gettimeofday(struct timeval *tv, struct timezone *tz){
 }
 
 
-void check_enter(int arg_num, char *table[]){
+int check_enter(int arg_num, char *table[]){
     if(arg_num != 2)
         error_handle("Number of arguments incorrect\n", NULL);
     
+    struct sockaddr_in recipient;
+    return Inet_pton(AF_INET, table[1], &recipient.sin_addr);
+
+    /* Sometimes it is better to search a little bit before implementing your own functions
     char *ip = table[1];
     int number_count = 0, byte = 0, byte_count = 0;
     
@@ -111,4 +122,5 @@ void check_enter(int arg_num, char *table[]){
 
     if(byte_count != 4) //incorrect number of bytes in ip address
         error_handle("Invalid address %s\n", table[1]);
+    */
 }
