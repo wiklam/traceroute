@@ -18,14 +18,14 @@ u_int16_t compute_icmp_checksum (const void *buff, int length){ //function from 
 const char *Inet_ntop(int af, const void *src, char *dst, socklen_t size){
     const char* rv = inet_ntop(af, src, dst, size);
     if(rv == NULL)
-        error_handle("Inet_ntop error: s\n", strerror(errno));
+        error_handle("Inet_ntop error: %s\n", strerror(errno));
     return rv;
 }
 
 int Inet_pton(int af, const char *src, void *dst){
     int rv = inet_pton(af, src, dst);
     if(rv <= 0)                                                //CHECK EQUAL ZERO
-        error_handle("Inet_pton error: s\n", strerror(errno));
+        error_handle("Inet_pton error: %s\n", strerror(errno));
     return rv;
 }
 
@@ -54,6 +54,8 @@ int Setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t
 
 ssize_t Recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen){
     ssize_t rv = recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    if(rv < 0 && errno == EWOULDBLOCK)
+        return 0;
     if (rv < 0)
         error_handle("Recvfrom error %s\n", strerror(errno));
     return rv;
@@ -74,6 +76,7 @@ int Gettimeofday(struct timeval *tv, struct timezone *tz){
         error_handle("Gettimeofday error %s\n", strerror(errno));
     return rv;
 }
+
 
 void check_enter(int arg_num, char *table[]){
     if(arg_num != 2)

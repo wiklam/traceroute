@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=gnu99 -Wextra -Wall -Wno-unused-parameter #-Werror
+CFLAGS = -std=gnu99 -Wextra -Wall #-Wno-unused-parameter #-Werror
 
 TARGET = traceroute
 

@@ -4,9 +4,11 @@
 #include <assert.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <unistd.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>          /* See NOTES - not required but in use in historical implementations*/
 #include <sys/select.h>
 #include <sys/socket.h>
@@ -24,6 +26,7 @@ int Setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t
 ssize_t Recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
 ssize_t Sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
 
+void error_handle(const char *str, char *err);
 
 int Gettimeofday(struct timeval *tv, struct timezone *tz);
 void check_enter(int num, char *table[]);
