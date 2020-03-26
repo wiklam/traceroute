@@ -45,7 +45,8 @@ static int get_data(u_int8_t *buffer, struct sockaddr_in *sender, struct data *d
 }
 
 
-static void output(int ttl, int reached, char *ip[3], struct timeval times[3]){
+//static void output(int ttl, int reached, char *ip[3], struct timeval times[3]){
+static void output(int ttl, int reached, char *ip[3], long long timesum){  
     printf("%d. ", ttl);
     if(reached == 0){
         printf("* * *\n");
@@ -61,8 +62,8 @@ static void output(int ttl, int reached, char *ip[3], struct timeval times[3]){
             printf("%s ", ip[it]);
     }
     if(reached == 3){   // if we catched all response packets calculate the average time
-        float sum = (times[0].tv_sec + times[1].tv_sec + times[2].tv_sec) * 1000 + times[0].tv_usec + times[1].tv_usec + times[2].tv_usec;
-        printf("%.3f ms\n", sum/3000);
+        //float sum = (times[0].tv_sec + times[1].tv_sec + times[2].tv_sec) * 1000 + times[0].tv_usec + times[1].tv_usec + times[2].tv_usec;
+        printf("  %.3f ms\n", ((float) timesum)/3000);
     }
     else
         printf("???\n");
@@ -98,16 +99,17 @@ static int receivepackets(int sfd, int ttl){
 
     char *ip_address[3];
 
-    struct timeval start, actual, times[3];
+    long long timesum = 0;
+    //struct timeval start, actual;
     struct timeval timeout;
-    timeout.tv_sec = 1;
-    timeout.tv_usec = 0;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 1000000;
 
     fd_set descriptors;
     FD_ZERO(&descriptors);
     FD_SET(sfd, &descriptors);
 
-    Gettimeofday(&start, NULL); // start - time value for which we will compare how long we have benn waiting for a response
+    //Gettimeofday(&start, NULL); // start - time value for which we will compare how long we have benn waiting for a response
 
 
     while(Select(sfd + 1, &descriptors, NULL, NULL, &timeout)){  //in LINUX Select modifies timeout http://man7.org/linux/man-pages/man2/select.2.html
@@ -118,10 +120,11 @@ static int receivepackets(int sfd, int ttl){
                 if(data.type == ICMP_ECHOREPLY)
                     arrived = 1;
                 
-                Gettimeofday(&actual, NULL);    // actual -time of receiving the packet
+                //Gettimeofday(&actual, NULL);    // actual -time of receiving the packet
 
                 ip_address[reached] = data.ip;
-                timersub(&actual, &start, &times[reached]);
+                timesum += 1000000 - (long long) timeout.tv_usec;
+                //timersub(&actual, &start, &times[reached]);
 
                 reached++;
                 if(reached == 3)
@@ -132,7 +135,8 @@ static int receivepackets(int sfd, int ttl){
         FD_SET(sfd, &descriptors);
     }
 
-    output(ttl, reached, ip_address, times);
+    //output(ttl, reached, ip_address, times);
+    output(ttl, reached, ip_address, timesum);
 
     for(int it = 0; it < reached; it++) // freeing memory after malloc in get_data (ugly)
         free(ip_address[it]);
